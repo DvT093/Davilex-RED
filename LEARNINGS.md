@@ -128,3 +128,10 @@ Details: `~/Projects/Games/Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 ### Valkuilen
 - Widget-rechthoeken in de DFM zijn na het inlezen absoluut: de positie van de parent er niet nog eens bij optellen.
 - Een film per flow staat nergens in de data (`[MOVIES]` is leeg); nu op bestandsnaam gekoppeld. Gemarkeerd als aanname tot de code het bevestigt.
+- **Upscalen bij A2 (9 nov 2026, middag):**
+	- Race: A2 laadt een blad van 768x512 heel én in stukken (het vierkant links van 512, soms een kwart rechts). Die stukken hebben een eigen hash, dus het texture-script moet ze apart maken. Gevonden met `<ID>_TEX_DUMP` en dan per stuk hashen. Check dit ook bij Europe Racer.
+	- P (pauze) gaf FATAL op `winmm!mixerGetNumDevs`, net als bij VR. A2 lost het op in SwARc (mixer-functies met 0 apparaten); de game slaat het dempen dan over en het originele pauzescherm blijft.
+	- Menu: knopstanden zoekt de engine op de definitienaam (`gdfBtnOkDlg.UpLink`). A2 zet per stand een symlink naar de upscale van het archiefbestand (`okay_up.png`), uit de prefixtabel in `skin.cpp`.
+	- Twee archiefbestanden met dezelfde naam (`radio_up.bmp` en `radio_up.tga`) krijgen dezelfde HD-naam. Laat de TGA winnen, anders een ondoorzichtig vierkant om de radioknop.
+	- Alpha die door het model gaat houdt een waas van bijna-nul over: een vaag vierkant om kleine knoppen. Alpha onder 16 op 0 zetten.
+	- Return volgt de TabOrder uit de DFM: op schermen waar Help TabOrder 0 heeft, opent Return de help. Dat is het originele gedrag, geen bug.
