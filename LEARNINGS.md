@@ -118,6 +118,9 @@ Details: `~/Projects/Games/Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 - Headless heeft `JAVA_HOME` naar Homebrew-openjdk nodig, anders "No version is set for command java" (asdf) en start hij niet.
 - **VA = bestandsoffset + 0x400c00** in GameMenu.dat. Met de offset uit `grep -b` zoeken vind je niks.
 - Delphi-event-handlers zijn alleen via pointers bereikbaar: Ghidra maakt er geen functies van. Oplossing: functiestarts zoeken (`55 8B EC` op een 4-byte-grens) en die lijst laten decompileren.
+- **Let op de DATA-sectie:** daar is bestandsoffset = VA - 0x400e00, niet - 0x400c00 (andere sectie-uitlijning). Lees tabellen (zoals punten per plek) via de sectietabel van de PE, niet met de CODE-formule.
+- Functies die alleen via pointers of een `call` bereikbaar zijn: zoek aanroepers met een bytescan op `E8 rel32` naar het doeladres en loop terug naar `55 8B EC` op een 4-byte-grens. Dat is sneller dan Ghidra en vond o.a. de flow na de race.
+- Een veld dat nergens met `[reg+disp]` wordt opgehoogd, kan via een samengestelde offset geschreven worden (record-basis + veld, bv. 0x2c + 0x1e4 = 0x210): zoek ook op die som.
 - Delphi-stringliterals staan direct na hun functie. Een string zoeken geeft dus meteen de functie ervoor.
 - De volgorde van strings koppelt een ini-sectie aan zijn unit: elke `SCORE_LAYOUT-x` staat direct na het `.pas`-pad van zijn control. Snelle eerste kaart vóór Ghidra.
 - Niet alles komt uit de ini: in de high scores zijn club (`Random(7)`) en totaaltijd (vaste 23:59:58) bij het laden verzonnen. Lees de laadfunctie, anders zoek je je dood naar een veld dat niet bestaat.
