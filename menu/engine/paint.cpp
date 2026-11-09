@@ -299,8 +299,12 @@ Painter::Tex* Painter::Texture(SDL_Surface* s, int key, bool dynamic) {
   t.h = pic->h;
   t.hd = hd;
   t.used = frame_;
-  // HD pictures may have alpha of their own (soft edges).
-  SDL_SetTextureBlendMode(t.tex, alpha || hd ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+  // HD pictures may have alpha of their own (soft edges), and so may the
+  // original when it is a 32-bit TGA (Europe Racer, A2 Racer IV: LoadTga
+  // marks those surfaces BLEND).
+  SDL_BlendMode own = SDL_BLENDMODE_NONE;
+  SDL_GetSurfaceBlendMode(s, &own);
+  SDL_SetTextureBlendMode(t.tex, alpha || hd || own == SDL_BLENDMODE_BLEND ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
   SDL_DestroySurface(pic);
   if (!t.tex) return nullptr;
   return &(tex_[k] = t);

@@ -61,6 +61,8 @@ Voorbeeld: de caravan-rij van Vakantie Racer. De engine levert een generieke teg
 
 ## 6. Upscalen: welk model wanneer
 
+Stap-voor-stap werkwijze voor HUD, race-textures en menu in 4K: zie `UPSCALING.md` in deze map.
+
 | Soort | Beste aanpak | Wat niet werkt |
 |---|---|---|
 | Menuplaatjes (3D-renders, logo, achtergronden) | realesrgan-x4plus | anime-model: huid wordt plastic |

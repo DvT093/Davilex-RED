@@ -198,10 +198,15 @@ void Font::DrawLine(SDL_Surface* dst, int x, int y, const std::string& s, int px
         if (pxx < cr.x || pxx >= cr.x + cr.w) continue;
         unsigned a = g->bitmap.buffer[r * g->bitmap.pitch + q];
         if (!a) continue;
-        Uint8 dr, dg, db;
-        SDL_GetRGB(row[pxx], fmt, nullptr, &dr, &dg, &db);
-        auto mix = [a](unsigned d, unsigned s) { return Uint8((s * a + d * (255 - a)) / 255); };
-        row[pxx] = SDL_MapRGB(fmt, nullptr, mix(dr, c.r), mix(dg, c.g), mix(db, c.b));
+        Uint8 dr, dg, db, da;
+        SDL_GetRGBA(row[pxx], fmt, nullptr, &dr, &dg, &db, &da);
+        if (!fmt->Amask) da = 255;
+        // "Over": on a transparent canvas (Painter's PaintOver overlay) the
+        // edge pixels keep the text colour with partial alpha, instead of
+        // being mixed with the canvas's black.
+        unsigned oa = a + da * (255 - a) / 255;
+        auto mix = [&](unsigned d, unsigned s) { return Uint8(oa ? (s * a + d * da * (255 - a) / 255) / oa : 0); };
+        row[pxx] = SDL_MapRGBA(fmt, nullptr, mix(dr, c.r), mix(dg, c.g), mix(db, c.b), Uint8(oa));
       }
     }
     pen += g->advance.x + (embolden ? px * 4 : 0);
