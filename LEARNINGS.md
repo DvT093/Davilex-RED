@@ -137,5 +137,5 @@ Details: `~/Projects/Games/Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 	- Return volgt de TabOrder uit de DFM: op schermen waar Help TabOrder 0 heeft, opent Return de help. Dat is het originele gedrag, geen bug.
 
 ## Alle drie: venster dicht = spel dicht (9 nov 2026, regel van Diederick)
-- Menu en race zijn twee processen, maar voor de speler is het één spel. Sluit de speler het racevenster (rode knop, Cmd+Q), dan moet het hele spel stoppen, ook het menu. Nu komt het menu weer terug (gezien in A2 Racer IV). Alleen een normaal einde (finish, Esc in de race, opnieuw starten) gaat terug naar het menu.
-- Richting: SwARc meldt over `<ID>_LINK_FD` dat de gebruiker het venster sloot, de gedeelde launcher sluit dan ook het menu. Volgens Diederick is dit bij Vakantie Racer al opgelost: neem die oplossing over en controleer hem in elke game.
+- Menu en race zijn twee processen, maar voor de speler is het één spel. Sluit de speler het racevenster (rode knop, Cmd+Q), dan moet het hele spel stoppen, ook het menu. Alleen een normaal einde (finish, Esc in de race, opnieuw starten) gaat terug naar het menu.
+- Gebouwd 9 nov 2026 door A2 Racer IV, één keer voor alle drie: SwARc d6cc03d (branch a2r4; op legacy-dx5 4618309) laat `user32_window.cpp` SDL QUIT/CLOSE_REQUESTED onthouden en `host_link.cpp` "closed" sturen vóór "exit"; Davilex-RED 1f6f014 laat `menu/engine/app.cpp` RunChild dan het menu sluiten. Test: race-TEST_INPUT `8 close` vanuit het menu, het menu moet meestoppen. Vakantie Racer getest: menu stopt mee.
