@@ -88,3 +88,15 @@ Getest en afgevallen: realesrgan-x4plus-anime (plastic huid, donkere rand om let
 - Lange laadtijd of strandbal: PNG's op de hoofdthread decoderen.
 - Een kleurtest (bv. alleen rood) in een zichtbaar venster: de gebruiker denkt dat het een bug is. Stil en verborgen testen.
 - Een HUD die iets doorzichtig is, kan origineel zijn (Vakantie Racer `overlay.ini` RGBA 200). Eerst met F9 vergelijken voordat je iets "repareert".
+
+## Europe Racer: wat anders is (9 nov 2026)
+
+Bekend uit de menu-port. Nog niets ge-upscaled: dit zijn de aandachtspunten.
+
+- **Menu draait al op de gedeelde Painter.** F9 en `ERACER_MENU_UPGRADES`/`ERACER_MENU_SIZE` werken. Er zijn alleen nog geen HD-plaatjes en er is geen upscale-script.
+- **Plaatjes komen niet uit DFM's maar uit `Menu/Graphics.IMG`** (322 TGA's, elk item u32 lengte + zlib; de gedeelde `RcsArchive` leest ze). `upscale_menu.py` moet dus het archief lezen in plaats van Menu.exe-formulieren.
+- **TGA's hebben echte alpha:** geen sleutelkleur. Stap 4 (achtergrond van knoppen naar alpha) valt weg; de alpha gaat apart door het model, zoals bij de race-textures. **Uitzondering:** sommige 32-bit TGA's hebben overal alpha 0 (`dfimg*`, `opp00`, `res1`) en worden ondoorzichtig getekend. Het script moet die net zo behandelen, anders worden ze onzichtbaar.
+- **Bijna alle tekst is TTF:** captions zijn LT_-sleutels uit `Language.ini`, in Hilde (`FONTDATA/HIS_____.TTF` van de cd) en Arial. Stap 5 (tekst opnieuw zetten) is dus waarschijnlijk alleen nodig voor logo's en tekst in foto's. Nog niet per plaatje nagekeken.
+- **HD-naam van knopstanden:** de engine noemt een knopstand `<definitie>.<UpLink|…>`, ook al komt het plaatje uit het archief. Meerdere definities delen soms hetzelfde TGA-bestand. Dan zijn er meerdere HD-bestanden voor één plaatje nodig, of de engine moet archiefplaatjes op bestandsnaam noemen. Dat laatste is beter, maar nog niet gebouwd.
+- **Zelf getekende tabellen** (high scores, eigenschapsbalken) gebruiken nu `Font::DrawLine` op de PaintOver-canvas en worden dus geschaald, niet scherp. Overzetten naar `davi::DrawText`/`davi::Blit` maakt ze scherp.
+- **Race (deel A):** `.d3d` en tga zitten met zlib in `res/rcs.IMG` (eerst 4 bytes lengte). Pak ze uit vóór het hashen. Verder is het dezelfde RED-omzetting, maar de hash is nog niet gecontroleerd, want de race van Europe Racer is nog niet geport.
