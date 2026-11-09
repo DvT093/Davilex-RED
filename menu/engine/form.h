@@ -113,6 +113,10 @@ struct Skin {
   // Skin::fonts index as is (A2 Racer IV) or 1 = font 1, else font 2 (VR).
   int default_font = 1;
   bool raw_font_index = false;
+  // TGDI components without a layout-ini caption: keep the DFM caption
+  // (Europe Racer: an LT_ key) or take [DEFAULT] Caption like other
+  // components (A2 Racer IV: its DFM captions are component names).
+  bool tgdi_dfm_caption = true;
   // Background bitmap name for a form class ("" = none), see Screen.
   std::function<std::string(const std::string& cls)> background_name;
 

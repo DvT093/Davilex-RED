@@ -301,8 +301,11 @@ void Form::Add(Skin& skin, const Component& c, int ox, int oy) {
     } else if (w->kind != Widget::kImage && w->kind != Widget::kOther && w->kind != Widget::kSlider) {
       bool btn = w->kind != Widget::kLabel;
       bool tgdi = c.cls.rfind("TGDI", 0) == 0;
-      // TGDI forms keep the DFM caption (an LT_ key) unless the layout ini sets one.
-      w->caption = get("Caption", &v) ? v : tgdi ? w->caption : caps.Get("DEFAULT", "Caption", "<No Value>");
+      // TGDI forms keep the DFM caption (an LT_ key) unless the layout ini
+      // sets one (Skin::tgdi_dfm_caption).
+      w->caption = get("Caption", &v)                   ? v
+                   : tgdi && skin.tgdi_dfm_caption ? w->caption
+                                                   : caps.Get("DEFAULT", "Caption", "<No Value>");
       if (skin.text) w->caption = skin.text(w->caption);
       if (tgdi) {
         // TGDI: [<form>] <comp>.FontName/FontStyles/FontHeight/FontColor, else the
