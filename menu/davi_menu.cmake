@@ -3,7 +3,8 @@
 #   set(DAVILEX_RED_DIR ${CMAKE_SOURCE_DIR}/../Davilex-RED)
 #   include(${DAVILEX_RED_DIR}/menu/davi_menu.cmake)
 #   target_link_libraries(<game>-menu PRIVATE davi_menu_engine)
-# Sources include "engine/<file>.h".
+#   target_link_libraries(<game>-menu PRIVATE davi_menu_launcher)  # optional
+# Sources include "engine/<file>.h" and "launcher/race_launcher.h".
 if(TARGET davi_menu_engine)
   return()
 endif()
@@ -20,3 +21,8 @@ target_link_libraries(davi_menu_engine PUBLIC SDL3::SDL3 Freetype::Freetype ZLIB
 if(APPLE)
   target_link_libraries(davi_menu_engine PUBLIC objc)  # app.cpp: activation handover to the race
 endif()
+
+# The RED-engine race handshake (game.ini, running the race in the menu
+# window's place, reading the results back). Optional: a game may keep its own.
+add_library(davi_menu_launcher STATIC ${CMAKE_CURRENT_LIST_DIR}/launcher/race_launcher.cpp)
+target_link_libraries(davi_menu_launcher PUBLIC davi_menu_engine)

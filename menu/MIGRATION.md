@@ -1,6 +1,6 @@
 # Overstappen op de gedeelde menu-engine
 
-`menu/engine/` is één engine voor Vakantie Racer (VR), Europe Racer (ER) en A2 Racer IV (A2). Hij is samengevoegd uit de drie kopieën met een 3-weg-merge op de gemeenschappelijke basis (VR-commit `d27da30`). ER draait er sinds 9 nov 2026 op: alle 54 testshots zijn in de originele look pixelgelijk aan de eigen kopie, op randgladheid van letters na (max 45 px per scherm).
+`menu/engine/` is één engine voor Vakantie Racer (VR), Europe Racer (ER) en A2 Racer IV (A2). Hij is samengevoegd uit de drie kopieën met een 3-weg-merge op de gemeenschappelijke basis (VR-commit `d27da30`). ER draait er sinds 9 nov 2026 op: alle 54 testshots zijn in de originele look pixelgelijk aan de eigen kopie, op randgladheid van letters na (max 45 px per scherm). VR draait er ook op sinds 9 nov 2026 (zie onder).
 
 ## Inbouwen (alle games)
 1. Verwijder `src/menu/engine/`.
@@ -12,6 +12,7 @@
    ```
    `davi_menu.cmake` regelt SDL3, Freetype, zlib, ffmpeg en `objc` (macOS). Includes blijven `"engine/<x>.h"`.
 3. Wijzig je engine-bestanden voortaan alleen hier, en meld het de andere sessies (ze bouwen er ook op).
+4. Optioneel: de race-handshake (`launcher/race_launcher.h`, `red::RaceLauncher`: game.ini schrijven in SwARc's overlay, de race op de plek van het menuvenster starten, opnieuw bij "restart", uitslag lezen) staat ook hier, als target `davi_menu_launcher` (brengt `davi_menu_engine` mee). Verwijder dan `src/menu/launcher/`. Een game die zijn eigen kopie houdt, linkt dit target gewoon niet.
 
 ## Wat er voor iedereen anders is
 - **Tekenen gaat via de Painter van VR** (`paint.h`, `hd.h`): native resolutie, HD-plaatjes, scherpe tekst, F9 origineel/upgraded. `AppConfig::upgraded`, `hd_dirs`, `render_w/h` zijn er voor alle games. `PaintOver` krijgt een transparante overlay: SDL-tekenen daarop wordt geschaald, `davi::Blit`/`davi::DrawText` wordt scherp getekend.
@@ -26,6 +27,7 @@
 - **Assets**: `Bitmap("naam")` zonder extensie probeert `.bmp` en dan `.tga`, uit mappen en daarna archieven. Nieuw: `Has(naam)`, `Load(naam)` (bytes), `AddArchive(dir, base)` (RCS `.IND/.IMG`, ruwe en zlib-items allebei), `LoadImage(bytes)` (BMP of TGA), `LoadTga(bytes)`.
 
 ## Vakantie Racer
+- Overgezet 9 nov 2026: `vracer-menu` linkt `davi_menu_launcher` (engine + launcher uit Davilex-RED), `src/menu/engine/` en `src/menu/launcher/` zijn weg. 136 testshots (origineel en upgraded, 3024x1964 en 800x600) naast de eigen kopie gelegd: gelijk, op twee bedoelde verschillen na. (1) Focus die `OnShow` zelf zet, blijft nu staan (Moeilijkheid op je eigen niveau, OK in Toetsen en Gevorderd, het naamveld bij een record); de oude engine zette er altijd de eerste knop overheen. (2) Radiogroepen per parent: in Opties zette Joystick kiezen eerder ook de Weergave-radio's uit (het monitorplaatje verdween).
 - Geen API-wijziging voor TDavi*-componenten, `TDaviThumb`, hd/paint of `RunChild`. Let op de punten hierboven bij radiogroepen en de layout-ini.
 - De upscale-tools (`tools/upscale_menu.py`, `menu_text.py`, `menu_lamps.py`) leunen op de plaatjesnamen (`NamePicture`): die zijn ongewijzigd.
 
