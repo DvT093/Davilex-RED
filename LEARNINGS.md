@@ -135,3 +135,7 @@ Details: `~/Projects/Games/Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 	- Twee archiefbestanden met dezelfde naam (`radio_up.bmp` en `radio_up.tga`) krijgen dezelfde HD-naam. Laat de TGA winnen, anders een ondoorzichtig vierkant om de radioknop.
 	- Alpha die door het model gaat houdt een waas van bijna-nul over: een vaag vierkant om kleine knoppen. Alpha onder 16 op 0 zetten.
 	- Return volgt de TabOrder uit de DFM: op schermen waar Help TabOrder 0 heeft, opent Return de help. Dat is het originele gedrag, geen bug.
+
+## Alle drie: venster dicht = spel dicht (9 nov 2026, regel van Diederick)
+- Menu en race zijn twee processen, maar voor de speler is het één spel. Sluit de speler het racevenster (rode knop, Cmd+Q), dan moet het hele spel stoppen, ook het menu. Nu komt het menu weer terug (gezien in A2 Racer IV). Alleen een normaal einde (finish, Esc in de race, opnieuw starten) gaat terug naar het menu.
+- Richting: SwARc meldt over `<ID>_LINK_FD` dat de gebruiker het venster sloot, de gedeelde launcher sluit dan ook het menu. Volgens Diederick is dit bij Vakantie Racer al opgelost: neem die oplossing over en controleer hem in elke game.
