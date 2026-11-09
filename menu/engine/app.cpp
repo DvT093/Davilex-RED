@@ -729,10 +729,17 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
   }
   if (sv[0] < 0) SDL_HideWindow(win_);
   bool hidden = sv[0] < 0, covered = false;
+  // "closed": the user closed the race window (close button, Cmd+Q). Menu
+  // and race are one program to the user, so the menu quits too instead
+  // of coming back (Davilex-RED LEARNINGS.md, "venster dicht = spel dicht").
+  bool closed = false;
   Placement after = before;
   std::string pending;
   auto handle = [&](const std::string& line) {
-    if (line == "shown") {
+    if (line == "closed") {
+      closed = true;
+      std::fprintf(stderr, "menu: the race window was closed, quitting\n");
+    } else if (line == "shown") {
       YieldActivationTo(pid);
       if (!hidden) SDL_HideWindow(win_);
       hidden = true;
@@ -745,6 +752,10 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
         after.fullscreen = fs != 0;
       std::fprintf(stderr, "menu: race window %d,%d %dx%d%s at the end\n", after.x, after.y, after.w, after.h,
                    after.fullscreen ? " fullscreen" : "");
+    } else if (line == "exit" && closed) {
+      covered = true;  // stay hidden: the menu quits as well
+      const char ack = 'x';
+      (void)!write(sv[0], &ack, 1);
     } else if (line == "exit") {
       // Back at the race window's place, black, before that one goes.
       Place(win_, after);
@@ -788,6 +799,10 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
   }
   read_link();
   if (sv[0] >= 0) close(sv[0]);
+  if (closed) {
+    Quit(0);
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+  }
   if (!covered) {  // no "exit" (no link, or the race crashed)
     Place(win_, after);
     SDL_ShowWindow(win_);
