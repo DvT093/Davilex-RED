@@ -9,11 +9,13 @@
 #include <unistd.h>
 
 #if defined(__APPLE__)
+#include <CoreGraphics/CoreGraphics.h>
 #include <objc/message.h>
 #include <objc/runtime.h>
 #endif
 
 #include <algorithm>
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -26,38 +28,82 @@ namespace davi {
 
 namespace {
 
-// The green title-bar button. Fullscreen here goes without a Space of
-// its own (see Init), and SDL then marks the window "no fullscreen": the
-// button turns into an old-style zoom "+". Marked fullscreen-capable
-// again, the button, Window > Enter Full Screen and Ctrl+Cmd+F all send
-// toggleFullScreen:, which goes to the main loop as an SDL event and
-// switches SDL's fullscreen (the same one as Alt+Enter).
-Uint32 g_toggle_fullscreen_event = 0;
-
 #if defined(__APPLE__)
-void ToggleFullScreenAction(id, SEL, id) {
-  if (!g_toggle_fullscreen_event) return;
-  SDL_Event e{};
-  e.type = g_toggle_fullscreen_event;
-  SDL_PushEvent(&e);
+template <typename R = void*, typename... A>
+R ObjMsg(void* o, const char* sel, A... a) {
+  return reinterpret_cast<R (*)(void*, SEL, A...)>(objc_msgSend)(o, sel_registerName(sel), a...);
 }
 #endif
 
-void EnableFullscreenButton(SDL_Window* win) {
+// The race's frames in this window (SwARc host_link.h, <ID>_EMBED): its
+// Metal layer is a remote CAContext, shown by a CALayerHost over the
+// renderer's own layer. Returns the CALayerHost (retained), or null.
+void* AttachRaceLayer(SDL_Renderer* ren, unsigned context_id) {
 #if defined(__APPLE__)
-  void* nsw = SDL_GetPointerProperty(SDL_GetWindowProperties(win), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
-  if (!nsw) return;
-  using Get = unsigned long (*)(void*, SEL);
-  using Set = void (*)(void*, SEL, unsigned long);
-  unsigned long b = reinterpret_cast<Get>(objc_msgSend)(nsw, sel_registerName("collectionBehavior"));
-  b &= ~((1ul << 8) | (1ul << 9));  // FullScreenAuxiliary, FullScreenNone
-  b |= 1ul << 7;                     // FullScreenPrimary
-  reinterpret_cast<Set>(objc_msgSend)(nsw, sel_registerName("setCollectionBehavior:"), b);
-  class_replaceMethod(object_getClass(reinterpret_cast<id>(nsw)), sel_registerName("toggleFullScreen:"),
-                      reinterpret_cast<IMP>(ToggleFullScreenAction), "v@:@");
-  if (!g_toggle_fullscreen_event) g_toggle_fullscreen_event = SDL_RegisterEvents(1);
+  void* metal = SDL_GetRenderMetalLayer(ren);
+  void* cls = reinterpret_cast<void*>(objc_getClass("CALayerHost"));
+  if (!metal || !cls) return nullptr;
+  void* host = ObjMsg(ObjMsg(cls, "alloc"), "init");
+  ObjMsg<void>(host, "setContextId:", uint32_t(context_id));
+  ObjMsg<void>(host, "setAnchorPoint:", CGPointMake(0, 0));
+  ObjMsg<void>(host, "setFrame:", ObjMsg<CGRect>(metal, "bounds"));
+  ObjMsg<void>(host, "setAutoresizingMask:", 2u | 16u);  // width and height sizable
+  ObjMsg<void>(metal, "addSublayer:", host);
+  return host;
 #else
-  (void)win;
+  (void)ren, (void)context_id;
+  return nullptr;
+#endif
+}
+
+// While the race has the keyboard: turbo is often Cmd, so Cmd+letter
+// must reach the race instead of the menu bar (Cmd+W would close the
+// window, Cmd+H hide the game). Cmd+Q (quit) and the Ctrl+Cmd ones
+// (fullscreen) stay. Returns what to give back (RestoreMenuKeys).
+std::vector<std::pair<void*, void*>> MuteMenuKeys() {
+  std::vector<std::pair<void*, void*>> saved;
+#if defined(__APPLE__)
+  void* app = ObjMsg(reinterpret_cast<void*>(objc_getClass("NSApplication")), "sharedApplication");
+  void* empty = ObjMsg(reinterpret_cast<void*>(objc_getClass("NSString")), "string");
+  std::vector<void*> menus{app ? ObjMsg(app, "mainMenu") : nullptr};
+  while (!menus.empty()) {
+    void* m = menus.back();
+    menus.pop_back();
+    if (!m) continue;
+    void* items = ObjMsg(m, "itemArray");
+    const unsigned long n = ObjMsg<unsigned long>(items, "count");
+    for (unsigned long i = 0; i < n; i++) {
+      void* it = ObjMsg(items, "objectAtIndex:", i);
+      if (void* sub = ObjMsg(it, "submenu")) menus.push_back(sub);
+      void* key = ObjMsg(it, "keyEquivalent");
+      const char* k = key ? ObjMsg<const char*>(key, "UTF8String") : nullptr;
+      const unsigned long mask = ObjMsg<unsigned long>(it, "keyEquivalentModifierMask");
+      if (!k || !*k || (mask & (1ul << 18)) || !std::strcmp(k, "q")) continue;  // Control; Cmd+Q
+      saved.emplace_back(it, ObjMsg(key, "retain"));
+      ObjMsg<void>(it, "setKeyEquivalent:", empty);
+    }
+  }
+#endif
+  return saved;
+}
+
+void RestoreMenuKeys(std::vector<std::pair<void*, void*>>& saved) {
+#if defined(__APPLE__)
+  for (auto& [item, key] : saved) {
+    ObjMsg<void>(item, "setKeyEquivalent:", key);
+    ObjMsg<void>(key, "release");
+  }
+#endif
+  saved.clear();
+}
+
+void DetachRaceLayer(void* host) {
+#if defined(__APPLE__)
+  if (!host) return;
+  ObjMsg<void>(host, "removeFromSuperlayer");
+  ObjMsg<void>(host, "release");
+#else
+  (void)host;
 #endif
 }
 
@@ -105,9 +151,9 @@ App::~App() {
 
 bool App::Init(const AppConfig& cfg) {
   cfg_ = cfg;
-  // Fullscreen without a Space of its own: the race child (RunChild) takes
-  // the screen over in place, and hiding this window then switches nothing.
-  SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
+  // Fullscreen is the system's own (on macOS a Space of its own, with its
+  // animation, the menu bar and the green button at the top): the race
+  // draws into this window (RunChild), so it never switches Spaces.
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
     SDL_Log("SDL_Init: %s", SDL_GetError());
     return false;
@@ -123,7 +169,15 @@ bool App::Init(const AppConfig& cfg) {
                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                               (cfg.fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
   if (!win_) return false;
-  EnableFullscreenButton(win_);
+  // Test hook: <child_id>_MENU_POS=x,y puts the window there (off screen
+  // for silent runs).
+  if (const char* e = cfg.child_id.empty() ? nullptr : std::getenv((cfg.child_id + "_MENU_POS").c_str())) {
+    int x, y;
+    if (std::sscanf(e, "%d,%d", &x, &y) == 2) {
+      SDL_SetWindowBordered(win_, false);  // macOS keeps a titled window partly on screen
+      SDL_SetWindowPosition(win_, x, y);
+    }
+  }
   ren_ = SDL_CreateRenderer(win_, nullptr);
   if (!ren_) return false;
   SDL_SetRenderVSync(ren_, 1);
@@ -628,8 +682,8 @@ int App::Run() {
             SetUpgraded(!cfg_.upgraded, true);
             break;
           }
-          if ((k == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT)) ||
-              (k == SDLK_F && (e.key.mod & SDL_KMOD_GUI) && (e.key.mod & SDL_KMOD_CTRL))) {
+          // Alt+Enter; Ctrl+Cmd+F is the Window menu's own.
+          if (k == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT)) {
             if (!e.key.repeat) ToggleFullscreen(win_);
             break;
           }
@@ -637,7 +691,6 @@ int App::Run() {
           break;
         }
         default:
-          if (g_toggle_fullscreen_event && e.type == g_toggle_fullscreen_event) ToggleFullscreen(win_);
           break;
       }
     }
@@ -720,6 +773,64 @@ void Place(SDL_Window* win, const Placement& p) {
 
 }  // namespace
 
+// Embedded race (RunChild): this window's input, as host_link.h's lines.
+// Alt+Enter and the window's own fullscreen stay here; the race hears the
+// new size.
+template <typename Send, typename SendSize>
+void App::ForwardToRace(const SDL_Event& e, Send& send, SendSize& send_size, bool& quit_sent) {
+  char b[96];
+  switch (e.type) {
+    case SDL_EVENT_QUIT:
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+      // Cmd+Q, the close button: the race closes, and the menu with it
+      // ("closed").
+      if (!quit_sent) send("quit");
+      quit_sent = true;
+      break;
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
+      if (e.key.key == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT)) {
+        if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) ToggleFullscreen(win_);
+        break;
+      }
+      std::snprintf(b, sizeof b, "key %c %d %d %d", e.type == SDL_EVENT_KEY_DOWN ? 'd' : 'u', int(e.key.scancode),
+                    int(e.key.mod), e.key.repeat ? 1 : 0);
+      send(b);
+      break;
+    case SDL_EVENT_MOUSE_MOTION:
+      std::snprintf(b, sizeof b, "motion %.2f %.2f %.2f %.2f", e.motion.x, e.motion.y, e.motion.xrel, e.motion.yrel);
+      send(b);
+      break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+      std::snprintf(b, sizeof b, "button %c %d %d", e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? 'd' : 'u',
+                    int(e.button.button), int(e.button.clicks));
+      send(b);
+      break;
+    case SDL_EVENT_MOUSE_WHEEL:
+      std::snprintf(b, sizeof b, "wheel %.2f", e.wheel.y);
+      send(b);
+      break;
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+      send("leave");
+      break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+      send("focus 1");
+      break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+      send("focus 0");
+      break;
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+      send_size();
+      break;
+    default:
+      break;
+  }
+}
+
 void App::DrawDim(int dim) {
   dim_ = dim;
   Draw();
@@ -727,12 +838,17 @@ void App::DrawDim(int dim) {
 }
 
 int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>* messages) {
-  // The race takes over this window's place (SwARc's host link: the child
-  // gets <ID>_WINDOW and a socket <ID>_LINK_FD). This window fades to
-  // black, stays up (black) until the race says its window is "shown",
-  // then hides; when the race says "exit" it comes back black at the
-  // race window's last placement before the race window goes, and the
-  // main loop fades it in. Without a link (no child_id) it is only hidden.
+  // The race draws into this window (SwARc's host link: the child gets
+  // <ID>_WINDOW, <ID>_EMBED and a socket <ID>_LINK_FD). This window fades
+  // to black and stays; once the race sends "layer <id>" its frames show
+  // over it and this window's input goes to the race over the link. To
+  // macOS it stays one app with one window, so fullscreen (its own Space)
+  // stays as the race starts and ends. When the race says "exit" the
+  // layer goes, the window is black again and the main loop fades it in.
+  // A race without embedding (no "layer") takes over this window's place
+  // instead: this window hides once the race window is "shown" and comes
+  // back at its last placement. Without a link (no child_id) it is only
+  // hidden.
   const Placement before = WindowPlacement(win_);
   const float density = SDL_GetWindowPixelDensity(win_);
   std::fprintf(stderr, "menu: window %d,%d %dx%d%s before the race\n", before.x, before.y, before.w,
@@ -747,15 +863,22 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
   if (!cfg_.child_id.empty() && socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0) {
     fcntl(sv[0], F_SETFD, FD_CLOEXEC);
     fcntl(sv[0], F_SETFL, fcntl(sv[0], F_GETFL) | O_NONBLOCK);
-    const std::string pw = cfg_.child_id + "_WINDOW=", pl = cfg_.child_id + "_LINK_FD=";
+    const std::string pw = cfg_.child_id + "_WINDOW=", pl = cfg_.child_id + "_LINK_FD=",
+                      pe = cfg_.child_id + "_EMBED=";
     env_s.erase(std::remove_if(env_s.begin(), env_s.end(),
-                               [&](const std::string& v) { return !v.compare(0, pw.size(), pw) || !v.compare(0, pl.size(), pl); }),
+                               [&](const std::string& v) {
+                                 return !v.compare(0, pw.size(), pw) || !v.compare(0, pl.size(), pl) ||
+                                        !v.compare(0, pe.size(), pe);
+                               }),
                 env_s.end());
     char buf[160];
     std::snprintf(buf, sizeof buf, "%d,%d,%d,%d,%d,%.3f", before.x, before.y, before.w, before.h,
                   before.fullscreen ? 1 : 0, density > 0 ? density : 1.0f);
     env_s.push_back(pw + buf);
     env_s.push_back(pl + std::to_string(sv[1]));
+#if defined(__APPLE__)
+    env_s.push_back(pe + "1");
+#endif
   }
   std::vector<char*> envp;
   for (auto& v : env_s) envp.push_back(const_cast<char*>(v.c_str()));
@@ -781,8 +904,109 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
   bool closed = false;
   Placement after = before;
   std::string pending;
+  // Embedded: the race's layer over this window (AttachRaceLayer).
+  void* race_layer = nullptr;
+  std::vector<std::pair<void*, void*>> muted_keys;  // MuteMenuKeys while embedded
+  bool quit_sent = false;
+  auto send = [&](const std::string& line) {
+    if (sv[0] < 0) return;
+    std::string s = line + "\n";
+    for (size_t off = 0; off < s.size();) {
+      ssize_t n = write(sv[0], s.data() + off, s.size() - off);
+      if (n > 0) {
+        off += size_t(n);
+      } else if (n < 0 && errno == EAGAIN) {
+        pollfd p{sv[0], POLLOUT, 0};
+        if (poll(&p, 1, 100) <= 0) return;
+      } else {
+        return;
+      }
+    }
+  };
+  auto send_size = [&] {
+    int w = 0, h = 0;
+    SDL_GetWindowSize(win_, &w, &h);
+    const float d = SDL_GetWindowPixelDensity(win_);
+    char b[64];
+    std::snprintf(b, sizeof b, "size %d %d %.3f", w, h, d > 0 ? d : 1.0f);
+    send(b);
+  };
   auto handle = [&](const std::string& line) {
-    if (line == "closed") {
+    unsigned id = 0;
+    int on = 0;
+    if (!race_layer && std::sscanf(line.c_str(), "layer %u", &id) == 1) {
+      race_layer = AttachRaceLayer(ren_, id);
+      std::fprintf(stderr, "menu: race draws into this window (context %u)%s\n", id,
+                   race_layer ? "" : ", but it cannot be shown");
+      if (race_layer) {
+        muted_keys = MuteMenuKeys();
+        std::fprintf(stderr, "menu: %zu menu bar shortcuts off during the race\n", muted_keys.size());
+        send_size();
+        send((SDL_GetWindowFlags(win_) & SDL_WINDOW_INPUT_FOCUS) ? "focus 1" : "focus 0");
+      }
+    } else if (!line.compare(0, 7, "msgbox ")) {
+      // A message box of the race, over this window (SwARc host_link.h).
+      unsigned flags = 0;
+      int def = 0, used = 0;
+      std::sscanf(line.c_str() + 7, "%u %d %n", &flags, &def, &used);
+      std::vector<std::string> part;
+      std::stringstream ss(line.substr(7 + size_t(used)));
+      for (std::string f; std::getline(ss, f, '\t');) part.push_back(f);
+      auto unesc = [](const std::string& t) {
+        std::string o;
+        for (size_t i = 0; i < t.size(); i++) {
+          if (t[i] == '\\' && i + 1 < t.size()) o += t[++i] == 'n' ? '\n' : t[i];
+          else o += t[i];
+        }
+        return o;
+      };
+      std::vector<std::string> labels;
+      std::vector<SDL_MessageBoxButtonData> buttons;
+      if (!part.empty()) {
+        std::stringstream bs(part[0]);
+        for (std::string b; std::getline(bs, b, ',');) {
+          const size_t c = b.find(':');
+          if (c == std::string::npos) continue;
+          labels.push_back(b.substr(c + 1));
+          buttons.push_back({0, std::atoi(b.c_str()), nullptr});
+        }
+      }
+      for (size_t i = 0; i < buttons.size(); i++) {
+        buttons[i].text = labels[i].c_str();
+        if (int(i) == def) buttons[i].flags |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+        if (buttons.size() == 1 || labels[i] == "Cancel") buttons[i].flags |= SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
+      }
+      const std::string caption = part.size() > 1 ? unesc(part[1]) : "", text = part.size() > 2 ? unesc(part[2]) : "";
+      std::fprintf(stderr, "menu: message box of the race: %s: %s\n", caption.c_str(), text.c_str());
+      SDL_MessageBoxData d{};
+      d.flags = SDL_MessageBoxFlags(flags) | SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT;
+      d.window = win_;
+      d.title = caption.c_str();
+      d.message = text.c_str();
+      d.numbuttons = int(buttons.size());
+      d.buttons = buttons.data();
+      int chosen = -1;
+      SDL_SetWindowRelativeMouseMode(win_, false);
+      SDL_ShowCursor();
+      if (buttons.empty() || !SDL_ShowMessageBox(&d, &chosen) || chosen < 0)
+        chosen = buttons.empty() ? 1 : buttons[size_t(std::clamp(def, 0, int(buttons.size()) - 1))].buttonID;
+      send("msgbox " + std::to_string(chosen));
+    } else if (std::sscanf(line.c_str(), "cursor %d", &on) == 1) {
+      if (on) SDL_ShowCursor();
+      else SDL_HideCursor();
+    } else if (std::sscanf(line.c_str(), "relmouse %d", &on) == 1) {
+      SDL_SetWindowRelativeMouseMode(win_, on != 0);
+    } else if (line == "shown" && race_layer) {
+      std::fprintf(stderr, "menu: race shown in this window\n");
+    } else if (line == "exit" && race_layer) {
+      DetachRaceLayer(race_layer);
+      race_layer = nullptr;
+      RestoreMenuKeys(muted_keys);
+      covered = true;
+      DrawDim(255);
+      DrawDim(255);
+      send("x");
+    } else if (line == "closed") {
       closed = true;
       std::fprintf(stderr, "menu: the race window was closed, quitting\n");
     } else if (line == "shown") {
@@ -831,18 +1055,91 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
       handle(line);
     }
   };
+  // Test hook: <child_id>_TEST_FORWARD=file, lines "<ms> key <scancode> d|u"
+  // and "<ms> focus 0|1" (ms after the race started): SDL events of this
+  // window as if real, through the same forwarding (silent runs, where
+  // this window is not the active one and gets no real input).
+  struct Fake {
+    Uint64 at;
+    SDL_Event e;
+  };
+  std::vector<Fake> fakes;
+  if (const char* tf = cfg_.child_id.empty() ? nullptr : std::getenv((cfg_.child_id + "_TEST_FORWARD").c_str())) {
+    std::ifstream f(tf);
+    std::string line;
+    const Uint64 t0 = SDL_GetTicks();
+    while (std::getline(f, line)) {
+      Fake k{};
+      int ms = 0, a = 0;
+      char ud = 0;
+      if (std::sscanf(line.c_str(), "%d key %d %c", &ms, &a, &ud) == 3) {
+        k.e.type = ud == 'd' ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+        k.e.key.scancode = SDL_Scancode(a);
+        k.e.key.key = SDL_GetKeyFromScancode(k.e.key.scancode, SDL_KMOD_NONE, false);
+        k.e.key.down = ud == 'd';
+      } else if (std::sscanf(line.c_str(), "%d focus %d", &ms, &a) == 2) {
+        k.e.type = a ? SDL_EVENT_WINDOW_FOCUS_GAINED : SDL_EVENT_WINDOW_FOCUS_LOST;
+      } else {
+        continue;
+      }
+      k.e.common.timestamp = 0;
+      k.at = t0 + Uint64(ms);
+      fakes.push_back(k);
+    }
+  }
   int status = 0;
+  const Uint64 spawned_at = SDL_GetTicks();
+  // Watch: this window should stay on the active Space and this app
+  // active the whole race (the race is drawn in it); log any change.
+  int on_space = -1, app_active = -1;
+  auto watch = [&] {
+#if defined(__APPLE__)
+    void* nsw = SDL_GetPointerProperty(SDL_GetWindowProperties(win_), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
+    void* app = ObjMsg(reinterpret_cast<void*>(objc_getClass("NSApplication")), "sharedApplication");
+    const int s = nsw && ObjMsg<bool>(nsw, "isOnActiveSpace") ? 1 : 0;
+    const int a = app && ObjMsg<bool>(app, "isActive") ? 1 : 0;
+    if ((on_space >= 0 && s != on_space) || (app_active >= 0 && a != app_active))
+      std::fprintf(stderr, "menu: %.2f s into the race: window %s the active Space, app %s\n",
+                   (SDL_GetTicks() - spawned_at) / 1000.0, s ? "on" : "NOT on", a ? "active" : "NOT active");
+    on_space = s, app_active = a;
+#endif
+  };
   for (;;) {
     read_link();
+    watch();
+    for (size_t i = 0; i < fakes.size();)
+      if (SDL_GetTicks() >= fakes[i].at) {
+        SDL_PushEvent(&fakes[i].e);
+        fakes.erase(fakes.begin() + long(i));
+      } else {
+        i++;
+      }
     pid_t r = waitpid(pid, &status, WNOHANG);
     if (r == pid || r < 0) break;
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
-      if (e.type == SDL_EVENT_QUIT) kill(pid, SIGTERM);
+      if (race_layer) {
+        ForwardToRace(e, send, send_size, quit_sent);
+      } else if (e.type == SDL_EVENT_QUIT) {
+        kill(pid, SIGTERM);
+      } else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT) &&
+                 !e.key.repeat && !hidden) {
+        ToggleFullscreen(win_);
+      }
     }
-    if (!hidden) DrawDim(255);  // vsync paces the loop
+    if (race_layer) SDL_WaitEventTimeout(nullptr, 2);  // the race draws; input goes out at once
+    else if (!hidden) DrawDim(255);  // vsync paces the loop
     else SDL_Delay(10);
   }
+  RestoreMenuKeys(muted_keys);
+  if (race_layer) {  // the race ended without "exit" (crashed)
+    DetachRaceLayer(race_layer);
+    race_layer = nullptr;
+    covered = true;
+    DrawDim(255);
+  }
+  SDL_SetWindowRelativeMouseMode(win_, false);
+  SDL_ShowCursor();
   read_link();
   if (sv[0] >= 0) close(sv[0]);
   if (closed) {

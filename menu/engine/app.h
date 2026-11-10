@@ -117,6 +117,9 @@ class App {
   };
   void Draw(const std::string* shot = nullptr);
   void DrawDim(int dim);  // Draw with black over it (0-255)
+  // RunChild with the race drawing into this window: one input event to it.
+  template <typename Send, typename SendSize>
+  void ForwardToRace(const SDL_Event& e, Send& send, SendSize& send_size, bool& quit_sent);
   void DrawForm(Screen& s, int ox, int oy);
   Screen* Top() const { return popups_.empty() ? cur_ : popups_.back(); }
   void Origin(Screen& s, int* ox, int* oy) const;
