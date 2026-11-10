@@ -46,7 +46,7 @@ Volgorde van boven naar onder:
 7. "📸 Screenshots": race in HD, origineel naast HD (uitsnede), F9-paar, de mod-schermen, nog een menuscherm. JPG, 1600 px breed, kwaliteit 85.
    - Race-shots met een originele auto en zijn eigen aanhanger (bij Vakantie Racer: Sjonnie en Anita met de tokkie-caravan). Geen bonusauto's zonder echte lak (Z3, DeLorean).
    - Alleen rijdend: nooit vast tegen een muur, boom of andere auto. Maak veel frames (`<ID>_SHOT_FROM`, `<ID>_SHOT_EVERY`) en kies.
-   - Origineel naast HD uit één run met een F9-druk (de twee frames rond de wissel), niet uit twee runs: die lopen net anders.
+   - Origineel naast HD uit één run met een F9-druk (de twee frames rond de wissel), niet uit twee runs: die lopen net anders. Zet `<ID>_SHOT_FRONT=1` aan: het eerste frame met de melding "ORIGINEEL" linksboven is na de wissel, het frame ervoor is HD. Kies een stuk met bomen en balustrades (uitgesneden randen): daar zie je het verschil; op weg en carrosserie nauwelijks. Bekijk het paar zelf voor je het publiceert.
    - Op hoge rendermaat (`<ID>_RESOLUTION=2618x1964`), anders zie je het verschil nauwelijks.
    - Een "achteruit kijken"-shot (camera voor de auto) laat de auto zelf zien als de aanhanger hem van achteren verbergt.
    - Testen buiten beeld: start de race direct met `<ID>_WINDOW=-9000,-9000,W,H`; `<ID>_BACKGROUND=1` alleen opent wel een zichtbaar venster.
