@@ -44,7 +44,13 @@ Volgorde van boven naar onder:
 5. `*English below.*`
 6. "✨ Wat is er nieuw": tabel met emoji per functie (native, HD met F9, menu 4K, mods, pauzemenu, 60 fps).
 7. "📸 Screenshots": race in HD, origineel naast HD (uitsnede), F9-paar, de mod-schermen, nog een menuscherm. JPG, 1600 px breed, kwaliteit 85.
-8. Over de repo, wat je nodig hebt, installeren (twee commando's), toetsen, opties, credits (SwARc door JT, MIT) en licentie.
+   - Race-shots met een originele auto en zijn eigen aanhanger (bij Vakantie Racer: Sjonnie en Anita met de tokkie-caravan). Geen bonusauto's zonder echte lak (Z3, DeLorean).
+   - Alleen rijdend: nooit vast tegen een muur, boom of andere auto. Maak veel frames (`<ID>_SHOT_FROM`, `<ID>_SHOT_EVERY`) en kies.
+   - Origineel naast HD uit één run met een F9-druk (de twee frames rond de wissel), niet uit twee runs: die lopen net anders.
+   - Op hoge rendermaat (`<ID>_RESOLUTION=2618x1964`), anders zie je het verschil nauwelijks.
+   - Een "achteruit kijken"-shot (camera voor de auto) laat de auto zelf zien als de aanhanger hem van achteren verbergt.
+   - Testen buiten beeld: start de race direct met `<ID>_WINDOW=-9000,-9000,W,H`; `<ID>_BACKGROUND=1` alleen opent wel een zichtbaar venster.
+8. "⚠️ Bekende problemen" (bv. auto's die de makers nooit goed van textures hebben voorzien). Over de repo, wat je nodig hebt, installeren (twee commando's), toetsen, opties, credits (SwARc door JT, MIT) en licentie.
 9. Daarna hetzelfde in het Engels, met dezelfde kop en hetzelfde ISO-blok.
 
 ## Volgorde van publiceren
