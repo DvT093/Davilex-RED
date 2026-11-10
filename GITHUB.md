@@ -20,7 +20,7 @@ Het format van [VakantieRacer-Revived](https://github.com/DvT093/VakantieRacer-R
 - Spelbestanden (`iso/`), de ISO zelf (`*.iso` in .gitignore).
 - `generated/` (de omgezette spelcode, afgeleid van de exe). Die maakt `setup.sh` bij de speler.
 - Persoonlijke werkafspraken: die staan in `CLAUDE.local.md` (gitignored). Ook niet in oude commits: check vóór de eerste push de hele geschiedenis (`git log -p | grep -iE "vault|Obsidian|Werken met"`) en herschrijf als het moet.
-- Commit-e-mail: `je GitHub-noreply-adres (`<id>+<login>@users.noreply.github.com`)`, nooit een werkadres. Check `git log --all --format='%ae %ce' | sort -u` vóór de push.
+- Commit-e-mail: het GitHub-noreply-adres `6576986+DvT093@users.noreply.github.com` (staat lokaal per repo in `git config user.email`). Nooit een echt adres (werk of Gmail): op een openbare repo leest iedereen het, ook spambots. Check `git log --all --format='%ae %ce' | sort -u` vóór de push.
 
 Wel in git: `symbols/` (alleen adressen en namen, zodat niemand Ghidra nodig heeft), screenshots in `docs/screenshots/`.
 
