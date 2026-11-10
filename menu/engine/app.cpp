@@ -24,6 +24,50 @@ extern char** environ;
 
 namespace davi {
 
+namespace {
+
+// The green title-bar button. Fullscreen here goes without a Space of
+// its own (see Init), and SDL then marks the window "no fullscreen": the
+// button turns into an old-style zoom "+". Marked fullscreen-capable
+// again, the button, Window > Enter Full Screen and Ctrl+Cmd+F all send
+// toggleFullScreen:, which goes to the main loop as an SDL event and
+// switches SDL's fullscreen (the same one as Alt+Enter).
+Uint32 g_toggle_fullscreen_event = 0;
+
+#if defined(__APPLE__)
+void ToggleFullScreenAction(id, SEL, id) {
+  if (!g_toggle_fullscreen_event) return;
+  SDL_Event e{};
+  e.type = g_toggle_fullscreen_event;
+  SDL_PushEvent(&e);
+}
+#endif
+
+void EnableFullscreenButton(SDL_Window* win) {
+#if defined(__APPLE__)
+  void* nsw = SDL_GetPointerProperty(SDL_GetWindowProperties(win), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
+  if (!nsw) return;
+  using Get = unsigned long (*)(void*, SEL);
+  using Set = void (*)(void*, SEL, unsigned long);
+  unsigned long b = reinterpret_cast<Get>(objc_msgSend)(nsw, sel_registerName("collectionBehavior"));
+  b &= ~((1ul << 8) | (1ul << 9));  // FullScreenAuxiliary, FullScreenNone
+  b |= 1ul << 7;                     // FullScreenPrimary
+  reinterpret_cast<Set>(objc_msgSend)(nsw, sel_registerName("setCollectionBehavior:"), b);
+  class_replaceMethod(object_getClass(reinterpret_cast<id>(nsw)), sel_registerName("toggleFullScreen:"),
+                      reinterpret_cast<IMP>(ToggleFullScreenAction), "v@:@");
+  if (!g_toggle_fullscreen_event) g_toggle_fullscreen_event = SDL_RegisterEvents(1);
+#else
+  (void)win;
+#endif
+}
+
+void ToggleFullscreen(SDL_Window* win) {
+  bool fs = SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN;
+  SDL_SetWindowFullscreen(win, !fs);
+}
+
+}  // namespace
+
 Screen::Screen(App& a, const std::string& form_cls) : app(a) {
   std::string layout = a.skin.assets ? a.skin.assets->Find("layout/" + form_cls + ".ini") : "";
   built = form.Build(a.skin, form_cls, layout);
@@ -79,6 +123,7 @@ bool App::Init(const AppConfig& cfg) {
                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                               (cfg.fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
   if (!win_) return false;
+  EnableFullscreenButton(win_);
   ren_ = SDL_CreateRenderer(win_, nullptr);
   if (!ren_) return false;
   SDL_SetRenderVSync(ren_, 1);
@@ -583,15 +628,16 @@ int App::Run() {
             SetUpgraded(!cfg_.upgraded, true);
             break;
           }
-          if (k == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT)) {
-            bool fs = SDL_GetWindowFlags(win_) & SDL_WINDOW_FULLSCREEN;
-            SDL_SetWindowFullscreen(win_, !fs);
+          if ((k == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT)) ||
+              (k == SDLK_F && (e.key.mod & SDL_KMOD_GUI) && (e.key.mod & SDL_KMOD_CTRL))) {
+            if (!e.key.repeat) ToggleFullscreen(win_);
             break;
           }
           Key(*t, k, e.key.mod);
           break;
         }
         default:
+          if (g_toggle_fullscreen_event && e.type == g_toggle_fullscreen_event) ToggleFullscreen(win_);
           break;
       }
     }

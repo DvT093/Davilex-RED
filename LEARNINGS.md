@@ -9,7 +9,7 @@ Voeg je eigen lessen hier toe (kopje met gamenaam en datum), dan leert de volgen
 - Origineel 1-op-1 nabouwen; alleen echt nieuwe mod-UI (bv. caravan kiezen) wordt ontworpen.
 - Elke beeld-upgrade schakelbaar: F9 wisselt live origineel/upgraded (menu én race, ook in het pauzemenu), F10 AA, F11 filtering, met een korte melding linksboven.
 - Spelwereld: een auto hoort bij zijn karakter (geen aparte karakterkeuze); bonusauto's rijdt de presentator. Speldata in het project (`userdata/`), niet in Application Support. 60 fps vast. Geen Wine, geen emulator.
-- Stil testen: `SDL_AUDIO_DRIVER=dummy`, `<ID>_BACKGROUND=1`, venster buiten beeld (`<ID>_WINDOW=-9000,-9000,W,H`). Eerst zelf testen met screenshots, dan pas melden; zeg wat niet getest is.
+- Stil testen: `SDL_AUDIO_DRIVER=dummy`, venster buiten beeld met `<ID>_WINDOW=-9000,-9000,W,H` en de race direct starten. `<ID>_BACKGROUND=1` alleen opent wél een zichtbaar venster (10 nov 2026 op zijn werk gezien). Eerst zelf testen met screenshots, dan pas melden; zeg wat niet getest is.
 - Persoonlijke werkafspraken (takenlijst, notities, toon) staan lokaal in `CLAUDE.local.md` (niet in git).
 
 ## 2. Laptop en samenwerking tussen sessies
@@ -147,3 +147,8 @@ Details: `../Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 ## Alle drie: venster dicht = spel dicht (9 nov 2026, regel van Diederick)
 - Menu en race zijn twee processen, maar voor de speler is het één spel. Sluit de speler het racevenster (rode knop, Cmd+Q), dan moet het hele spel stoppen, ook het menu. Alleen een normaal einde (finish, Esc in de race, opnieuw starten) gaat terug naar het menu.
 - Gebouwd 9 nov 2026 door A2 Racer IV, één keer voor alle drie: SwARc d6cc03d (branch a2r4; op legacy-dx5 4618309) laat `user32_window.cpp` SDL QUIT/CLOSE_REQUESTED onthouden en `host_link.cpp` "closed" sturen vóór "exit"; Davilex-RED 1f6f014 laat `menu/engine/app.cpp` RunChild dan het menu sluiten. Test: race-TEST_INPUT `8 close` vanuit het menu, het menu moet meestoppen. Vakantie Racer getest: menu stopt mee.
+
+## Alle drie: groene knop = volledig scherm (10 nov 2026)
+- Menu en race gaan fullscreen zonder eigen Space (`SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES=0`, voor de naadloze overdracht menu -> race). SDL zet het venster dan op `NSWindowCollectionBehaviorFullScreenNone`: de groene knop wordt een oud zoom-plusje.
+- Oplossing: na het maken van het venster `FullScreenPrimary` terugzetten en `toggleFullScreen:` op de SDL3Window-klasse vervangen. Knop, Venster > Volledig scherm en Ctrl+Cmd+F komen dan als SDL-event in de hoofdlus en schakelen SDL's eigen fullscreen (zonder Space). Menu: `menu/engine/app.cpp` (`EnableFullscreenButton`, ook Alt+Enter). Race: SwARc `user32_window.cpp`, alleen voor vensters van de front end (`placed`); de keuze van de speler (`user_fullscreen`) gaat boven die van het menu en gaat via de host link terug naar het menu.
+- Niet doen bij vensters mét Spaces: SDL roept daar zelf `toggleFullScreen:` aan.
