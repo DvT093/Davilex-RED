@@ -1,6 +1,6 @@
 # Upscalen naar 4K: werkwijze voor elke Davilex-port
 
-Hoe Vakantie Racer (9 nov 2026) zijn race-textures, HUD en menu scherp kreeg tot 4K, zo opgeschreven dat Europe Racer en A2 Racer IV het kunnen volgen. Lees eerst `LEARNINGS.md` (vooral 1, 2 en 6). Referentiecode staat in `~/Projects/Games/Vakantieracer` (`tools/make_texture_pack.py`, `tools/texture_pack.ini`, `tools/upscale_menu.py`, `tools/menu_text.py`, `tools/menu_lamps.py`, `src/menu/engine/paint.*`, `hd.h`) en in SwARc `legacy-dx5` (`platforms/win32/src/win32/texture_pack.{h,cpp}`).
+Hoe Vakantie Racer (9 nov 2026) zijn race-textures, HUD en menu scherp kreeg tot 4K, zo opgeschreven dat Europe Racer en A2 Racer IV het kunnen volgen. Lees eerst `LEARNINGS.md` (vooral 1, 2 en 6). Referentiecode staat in `../Vakantieracer` (`tools/make_texture_pack.py`, `tools/texture_pack.ini`, `tools/upscale_menu.py`, `tools/menu_text.py`, `tools/menu_lamps.py`, `src/menu/engine/paint.*`, `hd.h`) en in SwARc `legacy-dx5` (`platforms/win32/src/win32/texture_pack.{h,cpp}`).
 
 ## Kernprincipes (niet onderhandelbaar)
 

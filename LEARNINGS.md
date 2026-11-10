@@ -1,8 +1,16 @@
 # Davilex-RED: gedeelde lessen voor de native Mac-ports
 
-Eén plek voor wat we leerden bij Vakantie Racer (8-9 nov 2026), zodat Europe Racer en A2 Racer IV het niet opnieuw hoeven uit te zoeken. Alle drie: Davilex, RED-engine, statische recompilatie met SwARc (x86 → C++ → SDL3/Metal). Details per game staan in hun eigen `CLAUDE.md` en `re/findings.md`; voor Vakantie Racer: `~/Projects/Games/Vakantieracer/CLAUDE.md` en `re/findings.md`.
+Eén plek voor wat we leerden bij Vakantie Racer (8-9 nov 2026), zodat Europe Racer en A2 Racer IV het niet opnieuw hoeven uit te zoeken. Alle drie: Davilex, RED-engine, statische recompilatie met SwARc (x86 → C++ → SDL3/Metal). Details per game staan in hun eigen `CLAUDE.md` en `re/findings.md`; voor Vakantie Racer: `../Vakantieracer/CLAUDE.md` en `re/findings.md`.
 
 Voeg je eigen lessen hier toe (kopje met gamenaam en datum), dan leert de volgende game ervan.
+
+## 1. Ontwerpregels voor de ports
+
+- Origineel 1-op-1 nabouwen; alleen echt nieuwe mod-UI (bv. caravan kiezen) wordt ontworpen.
+- Elke beeld-upgrade schakelbaar: F9 wisselt live origineel/upgraded (menu én race, ook in het pauzemenu), F10 AA, F11 filtering, met een korte melding linksboven.
+- Spelwereld: een auto hoort bij zijn karakter (geen aparte karakterkeuze); bonusauto's rijdt de presentator. Speldata in het project (`userdata/`), niet in Application Support. 60 fps vast. Geen Wine, geen emulator.
+- Stil testen: `SDL_AUDIO_DRIVER=dummy`, `<ID>_BACKGROUND=1`, venster buiten beeld (`<ID>_WINDOW=-9000,-9000,W,H`). Eerst zelf testen met screenshots, dan pas melden; zeg wat niet getest is.
+- Persoonlijke werkafspraken (takenlijst, notities, toon) staan lokaal in `CLAUDE.local.md` (niet in git).
 
 ## 2. Laptop en samenwerking tussen sessies
 
@@ -10,7 +18,7 @@ Voeg je eigen lessen hier toe (kopje met gamenaam en datum), dan leert de volgen
 - Agents in dezelfde repo: elk commit alleen zijn eigen paden (`git add <paden>`), nooit andermans onafgemaakte wijzigingen.
 - Real-ESRGAN-binary en modellen niet in een scratchpad laten staan (weg na herstart): het script haalt ze zelf op in een gitignored `build/tools/` met sha256-check.
 
-## 3. SwARc: wat al gebouwd is (generiek, branch `legacy-dx5` in `~/Projects/Games/SwARc-dx5`)
+## 3. SwARc: wat al gebouwd is (generiek, branch `legacy-dx5`, lokaal als worktree `../SwARc-dx5`)
 
 - DirectX 5-adapters op de DX7/8-code: DirectDraw 1/2 + Surface 1/2, Direct3D 2 (Device2/Texture2/Viewport2/Material2), DirectInput 5, DirectSound legacy. DDSURFACEDESC (108) is een prefix van DDSURFACEDESC2 (124); DX7-vtables zijn supersets van DX2.
 - `kernel32_profile.cpp`: GetPrivateProfileString/Int, WritePrivateProfileString. **Cache verplicht:** de RED-engine leest bij het laden duizenden ini-sleutels; elke keer het bestand parsen kostte 2-9 s laadtijd en een macOS-strandbal. Nu geparste kopie in geheugen (opnieuw lezen alleen als het bestand verandert of de game schrijft): laden 0,7-1,0 s.
@@ -79,13 +87,13 @@ Stap-voor-stap werkwijze voor HUD, race-textures en menu in 4K: zie `UPSCALING.m
 ## 7. Valkuilen die we zelf maakten
 
 - "Lijkt op" is geen bewijs: de DeLorean-lak "leek" de Back to the Future-versie, maar was het Countach-blad. Toewijzing in de data nakijken.
-- Een idee niet als zijn melding opschrijven (zie 1).
+- Een idee niet als melding van de gebruiker opschrijven.
 - Agents die blind gas geven rijden tegen de muur: eerst de wereldpositie uit de data halen, dan de auto ervoor zetten.
 - Camping Walhalla (Vakantie Racer, etappe 5) bestaat echt achter een onzichtbare muur, maar loopt over een klif de zee in; gestaakt.
 
 ## A2 Racer IV (9 nov 2026)
 
-- **Eigen SwARc-worktree per game.** Zijn besluit: geen gedeelde generieke code meer aanpassen. A2 heeft `~/Projects/Games/SwARc-a2r4` (branch `a2r4`, afgesplitst van `legacy-dx5`); fixes daar raken VR en ER niet. Wil een ander game een fix, dan kopieert die hem naar zijn eigen branch.
+- **Eigen SwARc-worktree per game.** Zijn besluit: geen gedeelde generieke code meer aanpassen. A2 heeft `../SwARc-a2r4` (branch `a2r4`, afgesplitst van `legacy-dx5`); fixes daar raken VR en ER niet. Wil een ander game een fix, dan kopieert die hem naar zijn eigen branch.
 - **Jump tables die Ghidra mist:** 62 bleven open en gaven FATAL "indirect branch to unlifted address". `re/scripts/resolve_jumptables.py` leest `jmp [4*reg + T]` met llvm-objdump, haalt de grens uit `cmp reg,N` + `ja` (anders: lezen zolang de waarden in .text liggen). Twee valkuilen: dubbele doelen eruit (anders "duplicate case value" bij compileren) en nullen overslaan (gaten in de tabel).
 - **setjmp/longjmp (MSVC `_setjmp3`/`_longjmp`):** in `lifter.manifest` zowel `setjmp <adres _setjmp3>` als `resume <adres _longjmp>`. Alleen setjmp gaf "returned from a no-return call".
 - **Videogeheugen-probe:** de RED-engine maakt bij het starten 256x256-textures tot DDERR_OUTOFVIDEOMEMORY komt. SwARc gaf nooit die fout, dus 19.765 textures en een SIGBUS. Fix in DirectDraw: textures met DDSCAPS_VIDEOMEMORY tellen tegen het geheugen van de kaart (totaal min 8 MB) en geven OUTOFVIDEOMEMORY als het vol is. Daarna `available_texture_memory=58720256` in game.ini. VR/ER hadden dit misschien niet nodig omdat hun probe anders werkt; check bij een SIGBUS in `com::Publish`.
@@ -95,7 +103,7 @@ Stap-voor-stap werkwijze voor HUD, race-textures en menu in 4K: zie `UPSCALING.m
 
 ## Europe Racer (9 nov 2026)
 
-Details: `~/Projects/Games/Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
+Details: `../Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 
 ### Welke exe
 - De CD-exe (v1.0.0.24) en de exe uit Patch 3 zijn allebei **SafeDisc**-verpakt (`.text` versleuteld, secties `stxt*`). De officiële NoCD van Davilex (`dl/nocd/spel.exe`, 15-06-2002) is dezelfde code als Patch 3 zonder verpakking: die porten we. Check bij een volgende game eerst of er zo'n officiële NoCD bestaat voor je met SafeDisc gaat stoeien. Herkennen: zelfde sectiegroottes, entropie van `.text` normaal (6,7) en een echte importtabel.
@@ -112,7 +120,7 @@ Details: `~/Projects/Games/Europe Racer/CLAUDE.md` en `re/menu/findings.md`.
 - Schermen zijn opgebouwd uit kleine herbruikbare controllers (radiogroep, tekst per radio, plaatje per radio, carrousel van drie polaroids, tabs). Eén keer nabouwen en overal inzetten scheelt veel.
 - Radiogroepen gelden per container, anders zetten tabs elkaars radio's uit.
 - Achtergronden hebben zwarte gaten van 160x160 waar een polaroid hoort.
-- Besluit van Diederick: **ieder project een eigen kopie van de menu-engine** (`src/menu/engine/`), geen gedeelde engine.
+- Vervangen (9 nov 2026): het eerdere besluit "ieder project een eigen kopie van de menu-engine" geldt niet meer. Alle games gebruiken de gedeelde engine in `menu/engine/` (zie sectie 5, "Gedeelde menu-engine").
 
 ### Ghidra op het Delphi-menu
 - Headless heeft `JAVA_HOME` naar Homebrew-openjdk nodig, anders "No version is set for command java" (asdf) en start hij niet.
