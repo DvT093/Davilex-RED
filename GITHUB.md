@@ -31,6 +31,7 @@ Wel in git: `symbols/` (alleen adressen en namen, zodat niemand Ghidra nodig hee
 - Checkt Homebrew-pakketten en toont bij ontbreken de exacte `brew install ...`.
 - Zet de spelcode om, bouwt, downloadt het HD-pack van de release (met voortgangsbalk en sha256-check, terugval: zelf maken) en maakt de `.app`.
 - Vriendelijk: per stap een emoji, `[n/6]`, geschatte duur en een vinkje; kleur, `--plain` zonder. Opnieuw draaien slaat over wat klaar is.
+- Is ook de updater: `git pull && ./setup.sh`. Stap 3 draait daarom altijd `git submodule update --init --recursive` (een kale `git pull` zet de submodules niet bij; zonder die stap bouwt de speler met de oude SwARc en Davilex-RED). CD, HD-pack en liften worden overgeslagen, CMake bouwt alleen wat veranderd is. Opnieuw liften (15-30 min) alleen als `symbols/`, `re/jumptables_manual.tsv`, `lifter.manifest` of de lifter nieuwer zijn.
 - Gooit de ISO niet weg; zegt aan het eind dat hij weg mag of als back-up kan blijven.
 - Emoji: 🏖️ en 🚘 in de banner. Geen busje (🚐) en geen 💨: kinderachtig en er zijn geen bussen.
 
@@ -50,7 +51,7 @@ Volgorde van boven naar onder:
    - Op hoge rendermaat (`<ID>_RESOLUTION=2618x1964`), anders zie je het verschil nauwelijks.
    - Een "achteruit kijken"-shot (camera voor de auto) laat de auto zelf zien als de aanhanger hem van achteren verbergt.
    - Testen buiten beeld: start de race direct met `<ID>_WINDOW=-9000,-9000,W,H`; `<ID>_BACKGROUND=1` alleen opent wel een zichtbaar venster.
-8. "⚠️ Bekende problemen" (bv. auto's die de makers nooit goed van textures hebben voorzien). Over de repo, wat je nodig hebt, installeren (twee commando's), toetsen, opties, credits (SwARc door JT, MIT) en licentie.
+8. "⚠️ Bekende problemen" (bv. auto's die de makers nooit goed van textures hebben voorzien). Over de repo, wat je nodig hebt, installeren (twee commando's), "🔄 Updaten" (`git pull && ./setup.sh`), toetsen, opties, credits (SwARc door JT, MIT) en licentie.
 9. Daarna hetzelfde in het Engels, met dezelfde kop en hetzelfde ISO-blok.
 
 ## Volgorde van publiceren
@@ -61,3 +62,12 @@ Volgorde van boven naar onder:
 4. `gh repo create DvT093/<Game>-Revived --public`, push.
 5. `gh release create hd-v1 <zip>`.
 6. Proef: verse `git clone --recursive` vanaf GitHub, submodules aanwezig, zip-download geeft de juiste sha256.
+
+## Een update publiceren
+
+Een fix in SwARc of Davilex-RED (bv. fullscreen) komt pas bij spelers als de port-repo naar de nieuwe commit wijst.
+
+1. Commit en push in SwARc (de branch van elke game die het gebruikt: `a2r4`, `legacy-dx5`, ...) en in Davilex-RED.
+2. In elke port-repo: zet `external/SwARc` en `external/Davilex-RED` op die commits, commit (`external/SwARc: <wat>`) en push.
+3. Proef: in een clone van de vorige versie `git pull && ./setup.sh`; de nieuwe functie moet erin zitten zonder iets anders te doen.
+
