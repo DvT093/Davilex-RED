@@ -26,9 +26,12 @@ Wel in git: `symbols/` (alleen adressen en namen, zodat niemand Ghidra nodig hee
 
 ## setup.sh
 
-- Neemt een ISO (`hdiutil attach -readonly -nobrowse`, kopie naar `iso/`) of een uitgepakte map.
+- Neemt een ISO (`diskutil image attach --readOnly --nobrowse`, anders `hdiutil attach`; macOS 27 waarschuwt voor hdiutil), kopie naar `iso/`, of een uitgepakte map. Zonder pad haalt hij de image zelf van archive.org naar `dl/`, met een sha1-check (naam, url, grootte en sha1 bovenin setup.sh).
 - Checkt de versie met de sha256 van de exe; een verkeerde ISO geeft een duidelijke fout.
-- Checkt Homebrew-pakketten en toont bij ontbreken de exacte `brew install ...`.
+- Checkt Homebrew-pakketten; bij ontbreken vraagt hij "Zal ik het installeren met brew? [J/n]". Zonder terminal (Claude Code) stopt hij met de exacte `brew install ...`; `--ja` zegt ja op elke vraag.
+- Compileert standaard met één taak per performance-core, hooguit één per 2 GB geheugen (`<ID>_JOBS` overschrijft).
+- curl-voortgang alleen in een terminal; in een log `-sS` (anders wordt de balk één enorme regel).
+- Vraagt aan het eind één keer om een alias op het bureaublad (Finder via osascript; `build/.alias-gevraagd`). Een kopie van de app werkt niet: de launcher zoekt de projectmap op `../../..`.
 - Zet de spelcode om, bouwt, downloadt het HD-pack van de release (met voortgangsbalk en sha256-check, terugval: zelf maken) en maakt de `.app`.
 - Vriendelijk: per stap een emoji, `[n/6]`, geschatte duur en een vinkje; kleur, `--plain` zonder. Opnieuw draaien slaat over wat klaar is.
 - Is ook de updater: `git pull && ./setup.sh`. Stap 3 draait daarom altijd `git submodule update --init --recursive` (een kale `git pull` zet de submodules niet bij; zonder die stap bouwt de speler met de oude SwARc en Davilex-RED). CD, HD-pack en liften worden overgeslagen, CMake bouwt alleen wat veranderd is. Opnieuw liften (15-30 min) alleen als `symbols/`, `re/jumptables_manual.tsv`, `lifter.manifest` of de lifter nieuwer zijn.
@@ -40,7 +43,7 @@ Wel in git: `symbols/` (alleen adressen en namen, zodat niemand Ghidra nodig hee
 Volgorde van boven naar onder:
 1. Titel `# 🏖️ <Game> Revived 🚘`, één vetgedrukte zin wat het is.
 2. Badges (shields.io): macOS Apple Silicon, 60 fps, textures 4x HD, menu 4K, license MIT.
-3. Een `> [!IMPORTANT]`-blok: "Je hebt de ISO van <Game> nodig." De game zit niet in de repo; zeg gewoon waar je hem downloadt (bij Vakantie Racer: [Nationaal Archief Educatieve Games](https://nationaalarchiefeducatievegames.nl/archief/vakantie-racer/) met de directe Archive.org-link). Niet "je eigen CD": niemand heeft de CD nog. Check eerst dat die download dezelfde ISO is als de onze (hash).
+3. Een `> [!IMPORTANT]`-blok: "De game zelf zit niet in deze repo, alleen de port." Zeg dat setup.sh de image zelf van Archive.org haalt (met de link, en de pagina bij [Nationaal Archief Educatieve Games](https://nationaalarchiefeducatievegames.nl/archief/vakantie-racer/) waar hij te vinden is) en hoe je een eigen image meegeeft. Niet "je eigen CD": niemand heeft de CD nog. Check eerst dat die download dezelfde image is als de onze (hash).
 4. Eerste screenshot: **het hoofdmenu in 4K**. Zonder echte spelersnaam in beeld (bv. "Welkom Vakantieganger!") en zonder zwarte balken (bijsnijden tot 4:3).
 5. `*English below.*`
 6. "✨ Wat is er nieuw": tabel met emoji per functie (native, HD met F9, menu 4K, mods, pauzemenu, 60 fps).
