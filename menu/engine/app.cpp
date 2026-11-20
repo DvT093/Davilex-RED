@@ -907,7 +907,8 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
   // Embedded: the race's layer over this window (AttachRaceLayer).
   void* race_layer = nullptr;
   std::vector<std::pair<void*, void*>> muted_keys;  // MuteMenuKeys while embedded
-  bool quit_sent = false;
+  bool quit_sent = false, termed = false, killed = false;
+  Uint64 quit_at = 0;
   auto send = [&](const std::string& line) {
     if (sv[0] < 0) return;
     std::string s = line + "\n";
@@ -1116,12 +1117,28 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
       }
     pid_t r = waitpid(pid, &status, WNOHANG);
     if (r == pid || r < 0) break;
+    // A race that hangs never reads "quit": stop it after 3 s, force it
+    // 2 s later, so closing the window always ends both.
+    if (quit_sent) {
+      if (!quit_at) quit_at = SDL_GetTicks();
+      Uint64 waited = SDL_GetTicks() - quit_at;
+      if (waited > 5000 && !killed) {
+        SDL_Log("menu: the race does not stop, killing it");
+        kill(pid, SIGKILL);
+        killed = true;
+      } else if (waited > 3000 && !termed) {
+        SDL_Log("menu: the race does not answer quit, stopping it");
+        kill(pid, SIGTERM);
+        termed = true;
+      }
+    }
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
       if (race_layer) {
         ForwardToRace(e, send, send_size, quit_sent);
       } else if (e.type == SDL_EVENT_QUIT) {
         kill(pid, SIGTERM);
+        quit_sent = true;
       } else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_RETURN && (e.key.mod & SDL_KMOD_ALT) &&
                  !e.key.repeat && !hidden) {
         ToggleFullscreen(win_);
@@ -1132,6 +1149,8 @@ int App::RunChild(const std::vector<std::string>& argv, std::vector<std::string>
     else SDL_Delay(10);
   }
   RestoreMenuKeys(muted_keys);
+  // The user asked to quit and the race had to be stopped: quit the menu too.
+  if (termed || killed) closed = true;
   if (race_layer) {  // the race ended without "exit" (crashed)
     DetachRaceLayer(race_layer);
     race_layer = nullptr;
